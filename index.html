@@ -11,101 +11,135 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <!-- Tailwind CSS (Carga crítica) -->
+    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { 
+            font-family: 'Inter', sans-serif; 
             background-color: #050505; 
             color: white; 
-            font-family: sans-serif;
             margin: 0;
-            padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
-        .card {
-            background: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 20px;
-            padding: 20px;
-            margin-top: 20px;
+        .workout-card {
+            background: linear-gradient(145deg, rgba(17, 24, 39, 0.6), rgba(3, 7, 18, 0.8));
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 2.5rem;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .nav-blur {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
         }
     </style>
 </head>
-<body>
+<body class="pb-32">
 
     <div id="app">
-        <!-- Contenido de respaldo por si falla el JS -->
         <div class="flex items-center justify-center h-screen">
-            <p class="text-purple-500 font-bold animate-pulse">CARGANDO ENTRENAMIENTO...</p>
+            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500"></div>
         </div>
     </div>
 
     <script>
-        // Datos de entrenamiento
-        const pesosBase = { squat: 275, clean: 190, deadlift: 295, press: 135, snatch: 150, frontSquat: 252 };
-
-        function calcularPeso(base) {
-            const hoy = new Date();
-            const inicio = new Date(2026, 0, 5);
-            const dias = Math.floor((hoy - inicio) / (1000 * 60 * 60 * 24));
-            if (dias < 0) return base;
-            const semana = Math.floor(dias / 7);
-            const semanaCiclo = (semana % 4) + 1;
-            if (semanaCiclo === 4) return Math.round(base * 0.7);
-            return base + ((semanaCiclo - 1) * 10);
+        // --- DATOS Y LÓGICA ---
+        const baseWeights = { squat: 275, clean: 190, deadlift: 295, press: 135, snatch: 150, frontSquat: 252 };
+        
+        function getWeight(base, date) {
+            const startDate = new Date(2026, 0, 5);
+            const diff = Math.floor((date - startDate) / (1000 * 60 * 60 * 24));
+            if (diff < 0) return base;
+            const week = Math.floor(diff / 7);
+            const weekInCycle = (week % 4) + 1;
+            if (weekInCycle === 4) return Math.round(base * 0.7);
+            return base + ((weekInCycle - 1) * 10); // +10lbs/semana en Enero
         }
 
-        const rutinas = {
-            1: { titulo: "Lunes: Fuerza Base", ej: "Sentadilla Trasera", peso: "squat", rep: "5x5" },
-            2: { titulo: "Martes: Halterofilia", ej: "C&J Complex", peso: "clean", rep: "5x1" },
-            3: { titulo: "Miércoles: Tracción", ej: "Peso Muerto", peso: "deadlift", rep: "3x5" },
-            4: { titulo: "Jueves: Habilidad", ej: "HSPU Estrictos", peso: null, rep: "5xMáx" },
-            5: { titulo: "Viernes: Snatch", ej: "Snatch Complex", peso: "snatch", rep: "5x1" },
-            6: { titulo: "Sábado: Volumen", ej: "Remo 2000m", peso: null, rep: "Tempo" }
+        const routines = {
+            1: { name: "Lunes: Fuerza Base", blocks: [{ t: "FUERZA", ex: "Sentadilla Trasera", w: "squat", s: "5x5" }, { t: "METCON", ex: "The Engine", d: "10 DB Thrusters, 20 DU (AMRAP 15)" }] },
+            2: { name: "Martes: Halterofilia", blocks: [{ t: "FUERZA", ex: "C&J Complex", w: "clean", s: "5x1" }, { t: "EXTRA", ex: "Press Estricto", w: "press", s: "4x5" }] },
+            3: { name: "Miércoles: Tracción", blocks: [{ t: "FUERZA", ex: "Peso Muerto", w: "deadlift", s: "3x5" }, { t: "METCON", ex: "Heavy Breathing", d: "EMOM 16: Thrusters & Row" }] },
+            4: { name: "Jueves: Habilidad", blocks: [{ t: "SKILL", ex: "HSPU Estrictos", s: "5xMax" }, { t: "METCON", ex: "Triple Threat", d: "21-15-9 Thrusters & V-Ups" }] },
+            5: { name: "Viernes: Snatch", blocks: [{ t: "FUERZA", ex: "Snatch Complex", w: "snatch", s: "5x1" }, { t: "EXTRA", ex: "Front Squat", w: "frontSquat", s: "3x5" }] },
+            6: { name: "Sábado: Volumen", blocks: [{ t: "ENDURANCE", ex: "The Long Haul", d: "2000m Remo (Cap 45 min)" }] }
         };
 
-        function iniciarApp() {
-            const contenedor = document.getElementById('app');
-            const diaSemana = new Date().getDay();
-            const hoy = rutinas[diaSemana] || { titulo: "Descanso Activo", ej: "Caminar / Estirar", peso: null, rep: "-" };
+        let activeDate = new Date();
 
-            contenedor.innerHTML = `
-                <div class="p-6">
-                    <header class="mb-10">
-                        <h1 class="text-3xl font-black italic">ATLETA<span class="text-purple-500">PRO</span></h1>
-                        <p class="text-xs text-gray-500 font-bold tracking-widest mt-1">ENERO 2026</p>
-                    </header>
+        function render() {
+            const root = document.getElementById('app');
+            const day = activeDate.getDay();
+            const routine = routines[day] || { name: "Descanso Activo", blocks: [] };
+            
+            root.innerHTML = `
+                <header class="p-8 pt-12">
+                    <h1 class="text-2xl font-black italic uppercase leading-none">ATLETA<span class="text-purple-500">PRO</span></h1>
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">ENERO 2026 • ELITE PROG</p>
+                </header>
 
-                    <div class="card">
-                        <span class="text-purple-400 text-[10px] font-bold tracking-[0.3em] uppercase">Hoy</span>
-                        <h2 class="text-2xl font-black mt-2 mb-6">${hoy.titulo}</h2>
-                        
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <p class="font-bold text-lg text-white">${hoy.ej}</p>
-                                <p class="text-xs text-gray-500 font-bold uppercase">${hoy.rep}</p>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-3xl font-black italic text-white">${hoy.peso ? calcularPeso(pesosBase[hoy.peso]) : '--'}</span>
-                                <span class="text-[10px] font-bold text-purple-500 ml-1">LB</span>
-                            </div>
-                        </div>
+                <main class="px-6 space-y-8">
+                    <!-- Selector de Días -->
+                    <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                        ${[1,2,3,4,5,6,0].map(d => {
+                            const labels = ['D','L','M','X','J','V','S'];
+                            const isActive = activeDate.getDay() === d;
+                            return `
+                                <button onclick="setDay(${d})" class="flex-shrink-0 w-12 py-4 rounded-3xl border transition-all ${isActive ? 'bg-purple-600 border-purple-400' : 'bg-gray-900/50 border-gray-800'}">
+                                    <span class="text-[10px] block font-black opacity-40 mb-1">${labels[d]}</span>
+                                    <span class="font-black text-sm">${d === 0 ? 'R' : d}</span>
+                                </button>
+                            `;
+                        }).join('')}
                     </div>
-                    
-                    <p class="text-[10px] text-gray-600 text-center mt-12 uppercase font-bold tracking-widest">
-                        Abre el menú del navegador para instalar como App
-                    </p>
-                </div>
+
+                    <!-- Rutina -->
+                    <div class="space-y-6">
+                        <h2 class="text-4xl font-black italic uppercase tracking-tighter leading-none">${routine.name}</h2>
+                        
+                        ${routine.blocks.length > 0 ? routine.blocks.map(b => `
+                            <div class="workout-card p-8">
+                                <span class="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em] block mb-6">${b.t}</span>
+                                <div class="flex justify-between items-end">
+                                    <div>
+                                        <p class="text-xl font-bold leading-tight">${b.ex}</p>
+                                        <p class="text-[10px] font-black text-gray-500 uppercase mt-1 tracking-widest">${b.s || 'COMPLETA'}</p>
+                                    </div>
+                                    ${b.w ? `
+                                        <div class="text-right">
+                                            <span class="text-3xl font-black italic leading-none">${getWeight(baseWeights[b.w], activeDate)}</span>
+                                            <span class="text-[10px] font-black text-purple-500 ml-1">LB</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                ${b.d ? `<p class="mt-6 text-xs text-gray-400 italic border-l-2 border-purple-500/30 pl-4">${b.d}</p>` : ''}
+                            </div>
+                        `).join('') : '<div class="py-20 text-center opacity-20 font-black italic uppercase text-3xl">Recovery</div>'}
+                    </div>
+                </main>
+
+                <nav class="fixed bottom-0 left-0 right-0 nav-blur border-t border-white/5 py-8 px-12 flex justify-around">
+                    <i data-lucide="calendar" class="text-purple-500"></i>
+                    <i data-lucide="zap" class="text-gray-600"></i>
+                    <i data-lucide="user" class="text-gray-600"></i>
+                </nav>
             `;
+            lucide.createIcons();
         }
 
-        // Ejecutar al cargar
-        window.onload = iniciarApp;
-
-        // Service Worker silencioso
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        function setDay(d) {
+            const now = new Date();
+            const diff = d - now.getDay();
+            const newDate = new Date();
+            newDate.setDate(now.getDate() + diff);
+            activeDate = newDate;
+            render();
         }
+
+        window.onload = render;
     </script>
 </body>
 </html>
