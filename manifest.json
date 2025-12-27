@@ -1,24 +1,24 @@
-// Nombre del caché para la app
-const CACHE_NAME = 'atleta-pro-cache-v1';
-
-// Archivos básicos para que la app abra
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json'
-];
-
-// Instalación del Service Worker
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-  );
-});
-
-// Estrategia de carga: Primero red, si falla, caché
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
-  );
-});
+{
+  "name": "Atleta PRO 2026",
+  "short_name": "AtletaPRO",
+  "description": "Programación Progresiva de Entrenamiento Elite 2026",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
