@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Atleta PRO 2026 - Entrenamiento Elite</title>
+    
+    <!-- Configuración PWA (Necesaria para que aparezca "Instalar") -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#8b5cf6">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -31,6 +39,18 @@
 </head>
 <body>
     <div id="root"></div>
+    
+    <!-- Registro del Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('SW registrado', reg))
+                    .catch(err => console.log('Error SW', err));
+            });
+        }
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect } = React;
 
@@ -80,15 +100,12 @@
                 const weekInCycle = ((absoluteWeek - 1) % 4) + 1;
                 const isDeload = weekInCycle === 4;
 
-                // Lógica de incremento solicitada:
-                // Bloque 1 (Ene/Feb): Incremento acumulativo original
-                // Bloque 2-5 (Mar-Jun): +5lb en semana 2 y 3 respecto a la semana 1. Semana 4 descarga.
                 let strengthIncrement = 0;
                 if (block === 1) {
                     strengthIncrement = (absoluteWeek <= 4) ? (weekInCycle - 1) * 10 : 10 + (weekInCycle - 1) * 5;
                 } else {
                     if (weekInCycle === 2 || weekInCycle === 3) strengthIncrement = 5;
-                    if (isDeload) strengthIncrement = 0; // Protocolo descarga manejado internamente
+                    if (isDeload) strengthIncrement = 0; 
                 }
 
                 return { absoluteWeek, weekInCycle, isDeload, strengthIncrement, block };
@@ -106,7 +123,6 @@
                     return baseVal + info.strengthIncrement;
                 };
 
-                // BLOQUE 1: ENERO / FEBRERO (Semanas 1 a 8) - Sin cambios
                 const phaseJanFeb = {
                     1: { name: "LUNES: Empuje y Estabilidad", blocks: [
                         { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 500m Remo suave + 10 Scapular Pull-ups + 15 Air Squats + 30 seg Hollow Hold."] },
@@ -153,7 +169,6 @@
                     ]}
                 };
 
-                // BLOQUE 2: MARZO (Semanas 9 a 12)
                 const phaseMarch = {
                     1: { name: "LUNES: Fuerza de Base y Transición de Gimnasia", blocks: [
                         { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 400m Remo + 10 Ring Rows altos + 15 Goblet Squats (con DB de 40 lbs) + 30 seg Superman Hold."] },
@@ -203,7 +218,6 @@
                     ]}
                 };
 
-                // BLOQUE 3: ABRIL (Semana 13 a 16)
                 const phaseApril = {
                     1: { name: "LUNES: Fuerza Explosiva y Agilidad", blocks: [
                         { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 500m Remo suave + 10 Ring Swings + 15 Air Squats + 10 Scapular Push-ups."] },
@@ -253,7 +267,6 @@
                     ]}
                 };
 
-                // BLOQUE 4: MAYO (Semana 17 a 20)
                 const phaseMay = {
                     1: { name: "LUNES: Fuerza Máxima y Potencia Gimnástica", blocks: [
                         { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 500m Remo + 10 Ring Swings + 15 Jumping Squats + 1 min Plank."] },
@@ -303,7 +316,6 @@
                     ]}
                 };
 
-                // BLOQUE 5: JUNIO (Semana 21 a 24)
                 const phaseJune = {
                     1: { name: "LUNES: Día de la Sentadilla y Estabilidad", blocks: [
                         { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min Remo progresivo + Movilidad cadera/tobillo + 2 rondas 10 Air Squats lentas con banda."] },
@@ -339,7 +351,8 @@
                     5: { name: "VIERNES: Snatch y Estética de Cierre", blocks: [
                         { title: "CALENTAMIENTO", type: "calentamiento", items: ["Pasos banda + 3 rondas: 10 Snatch Balance + 10 OHS + 1 min saltos cuerda."] },
                         { title: "HALTEROFILIA", type: "fuerza", exercises: [
-                            { name: "Snatch", sets: "4", reps: "1", weight: info.isDeload ? calc(200, true) : (info.weekInCycle === 3 ? calc(210, false) : calc(200, false)) }
+                            { name: "Snatch", sets: "4", reps: "1", weight: calc(200, info.isDeload) },
+                            { name: "Sentadilla Frontal", sets: "3", reps: "1", weight: calc(335, info.isDeload) }
                         ]},
                         { title: "METCON", type: "metcon", items: ["'Fran' (21-15-9): Thrusters (95 o DB 40s) + Pull-ups."] },
                         { title: "ACCESORIOS", type: "accesorios", items: ["Pecho: 3x10 Decline DB Press + 3x Max Dips.", "Gimnasia: 4x3 Negativas MU (10 seg)."] },
