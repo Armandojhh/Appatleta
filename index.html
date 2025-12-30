@@ -3,185 +3,518 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Atleta PRO 2026</title>
+    <title>Atleta PRO 2026 - Entrenamiento Elite</title>
     
-    <!-- PWA Config -->
+    <!-- Configuración PWA (Necesaria para que aparezca "Instalar") -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#8b5cf6">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: #050505; 
-            color: white; 
-            margin: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .workout-card {
-            background: linear-gradient(145deg, rgba(17, 24, 39, 0.6), rgba(3, 7, 18, 0.8));
-            border: 1px solid rgba(139, 92, 246, 0.2);
-            border-radius: 2.5rem;
-        }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .nav-blur {
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-        }
-        .animate-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        :root { --brand: #8b5cf6; --bg: #050505; }
+        body { background: var(--bg); color: #fff; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        .glass { background: rgba(18, 18, 21, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .day-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; border-radius: 12px; cursor: pointer; transition: all 0.2s; position: relative; }
+        .has-workout { background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c4b5fd; font-weight: 700; }
+        .is-Sunday { background: rgba(255, 255, 255, 0.03); color: rgba(255, 255, 255, 0.1); pointer-events: none; }
+        .is-deload { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: #10b981; }
+        .workout-card { border-left: 4px solid transparent; margin-bottom: 1rem; transition: transform 0.2s; }
+        .workout-card.calentamiento { border-color: #10b981; }
+        .workout-card.fuerza { border-color: #8b5cf6; }
+        .workout-card.metcon { border-color: #ef4444; }
+        .workout-card.accesorios { border-color: #3b82f6; }
+        .workout-card.bonus { border-color: #f59e0b; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="pb-32">
-
-    <div id="app">
-        <!-- Loader inicial -->
-        <div class="flex items-center justify-center h-screen">
-            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500"></div>
-        </div>
-    </div>
-
+<body>
+    <div id="root"></div>
+    
+    <!-- Registro del Service Worker -->
     <script>
-        // --- CONFIGURACIÓN DE PESOS ---
-        const baseWeights = { 
-            squat: 275, 
-            clean: 190, 
-            deadlift: 295, 
-            press: 135, 
-            snatch: 150, 
-            frontSquat: 252 
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('SW registrado', reg))
+                    .catch(err => console.log('Error SW', err));
+            });
+        }
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const INITIAL_BENCHMARKS = {
+            "BACK SQUAT": 370, "DEADLIFT": 395, "STRICT PRESS": 180, 
+            "CLEAN & JERK": 265, "SNATCH": 210, "FRONT SQUAT": 315,
+            "DB BENCH PRESS PR": 256
         };
-        
-        // Lógica de progresión para Enero 2026
-        function getWeight(base, date) {
-            const startDate = new Date(2026, 0, 5); // Lunes 5 de Enero
-            const diff = Math.floor((date - startDate) / (1000 * 60 * 60 * 24));
-            
-            // Si la fecha es anterior al inicio del programa, usamos el base
-            if (diff < 0) return base;
-            
-            const week = Math.floor(diff / 7);
-            const weekInCycle = (week % 4) + 1;
-            
-            if (weekInCycle === 4) return Math.round(base * 0.7); // Semana de descarga
-            return base + ((weekInCycle - 1) * 10); // +10lbs por semana en Enero
+
+        function App() {
+            const [data, setData] = useState(() => {
+                const saved = localStorage.getItem('atleta_pro_2026_v13');
+                return saved ? JSON.parse(saved) : { benchmarks: INITIAL_BENCHMARKS };
+            });
+            const [unit, setUnit] = useState('LB');
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [currentMonthIdx, setCurrentMonthIdx] = useState(0); 
+            const [view, setView] = useState('calendar');
+
+            useEffect(() => {
+                localStorage.setItem('atleta_pro_2026_v13', JSON.stringify(data));
+            }, [data]);
+
+            const getCycleInfo = (dateStr) => {
+                const start = new Date("2026-01-05T00:00:00"); 
+                const current = new Date(dateStr + "T00:00:00");
+                const endProg = new Date("2026-06-22T00:00:00");
+
+                if (current < start) return null;
+                if (current >= endProg) return { status: "AWAIT_UPDATE" };
+                
+                const diffDays = Math.floor((current - start) / (1000 * 60 * 60 * 24));
+                const absoluteWeek = Math.floor(diffDays / 7) + 1;
+                
+                let block = 1;
+                const d = current.getTime();
+                const mar2 = new Date("2026-03-02T00:00:00").getTime();
+                const mar30 = new Date("2026-03-30T00:00:00").getTime();
+                const apr27 = new Date("2026-04-27T00:00:00").getTime();
+                const may25 = new Date("2026-05-25T00:00:00").getTime();
+
+                if (d >= mar2 && d < mar30) block = 2; 
+                else if (d >= mar30 && d < apr27) block = 3; 
+                else if (d >= apr27 && d < may25) block = 4; 
+                else if (d >= may25) block = 5; 
+
+                const weekInCycle = ((absoluteWeek - 1) % 4) + 1;
+                const isDeload = weekInCycle === 4;
+
+                let strengthIncrement = 0;
+                if (block === 1) {
+                    strengthIncrement = (absoluteWeek <= 4) ? (weekInCycle - 1) * 10 : 10 + (weekInCycle - 1) * 5;
+                } else {
+                    if (weekInCycle === 2 || weekInCycle === 3) strengthIncrement = 5;
+                    if (isDeload) strengthIncrement = 0; 
+                }
+
+                return { absoluteWeek, weekInCycle, isDeload, strengthIncrement, block };
+            };
+
+            const getWorkout = (dateStr) => {
+                const date = new Date(dateStr + "T12:00:00");
+                const day = date.getDay(); 
+                const info = getCycleInfo(dateStr);
+                
+                if (!info || info.status === "AWAIT_UPDATE" || day === 0) return null;
+
+                const calc = (baseVal, isDeload) => {
+                    if (isDeload) return Math.round(baseVal * 0.65);
+                    return baseVal + info.strengthIncrement;
+                };
+
+                const phaseJanFeb = {
+                    1: { name: "LUNES: Empuje y Estabilidad", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 500m Remo suave + 10 Scapular Pull-ups + 15 Air Squats + 30 seg Hollow Hold."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Sentadilla Trasera", sets: "5", reps: "5", weight: Math.round((data.benchmarks["BACK SQUAT"] * 0.75) + info.strengthIncrement) }] },
+                        { title: "METCON", type: "metcon", items: ["'The Engine' (AMRAP 15 min): 10 DB Thrusters (40 lbs) + 20 Double Unders + 10 Push-ups."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Anillas: 4x30s Top Ring Support + 12 Ring Rows.", "Pecho: 3x12 DB Bench Press + 3x15 DB Flyes."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower Zona 2 constante."] }
+                    ]},
+                    2: { name: "MARTES: Halterofilia y Potencia", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["Movilidad hombro banda + 3 rondas: 10 Burgener Warm-up + 10 Good Mornings."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "C&J Complex (1 PC + 1 FS + 1 SJ)", sets: "5", reps: "1", weight: Math.round((data.benchmarks["CLEAN & JERK"] * 0.72) + info.strengthIncrement) },
+                            { name: "Press Estricto", sets: "4", reps: "5", weight: Math.round((data.benchmarks["STRICT PRESS"] * 0.75) + info.strengthIncrement) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'Row & Burn': 4 Rondas: 500m Remo + 15 T2B + 10 Burpees bar."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 rondas: 15 DB Pullovers + 20 Russian Twists."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Recuperación activa."] }
+                    ]},
+                    3: { name: "MIÉRCOLES: Tracción y Resistencia", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min Remo + Movilidad cadera + 3 rondas 10 KB Swings."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Peso Muerto", sets: "3", reps: "5", weight: Math.round((data.benchmarks["DEADLIFT"] * 0.78) + info.strengthIncrement) }] },
+                        { title: "METCON", type: "metcon", items: ["'Heavy Breathing' (EMOM 16 min): M1: 15 DB Thrusters, M2: 15/12 Cal Row, M3: 15 Box Jumps, M4: Rest."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 rondas de: 10 Ring Dips (con banda elástica) + 15 Face Pulls con banda."] },
+                        { title: "BONUS", type: "bonus", items: ["45 min Rower Zona 2."] }
+                    ]},
+                    4: { name: "JUEVES: Habilidad y Gimnasia", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 30s Handstand Hold + 10 Beat Swings + 15 Goblet Squats."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "HSPU Estrictos", sets: "5", reps: "Max Reps", weight: "BW" }] },
+                        { title: "METCON", type: "metcon", items: ["'Triple Threat' (21-15-9): DB Thrusters + Ring Rows + V-Ups."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 rondas de: 12 Chest Press con banda + 12 Bicep Curls DB + 12 Tricep Extensions DB."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower Zona 2."] }
+                    ]},
+                    5: { name: "VIERNES: Snatch y Fuerza Frontal", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 10 Muscle Snatch (barra) + 10 OHS + 1 min DU."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "Snatch Complex (1 Snatch Balance + 1 Hang Snatch + 1 Squat Snatch)", sets: "5", reps: "1", weight: Math.round((data.benchmarks["SNATCH"] * 0.70) + info.strengthIncrement) },
+                            { name: "Sentadilla Frontal", sets: "3", reps: "5", weight: Math.round((data.benchmarks["FRONT SQUAT"] * 0.80) + info.strengthIncrement) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'Sprint Finish': 5 Rondas: 200m Remo + 10 Push-ups + 10 Box Jumps."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Pecho: 3x10 Decline DB Press + 3x Max Dips en rack.", "Gimnasia: 3x5 Negativas Muscle-up."] }
+                    ]},
+                    6: { name: "SÁBADO: Volumen", blocks: [
+                        { title: "METCON", type: "metcon", items: ["'The Long Haul' (Cap 45 min): 2000m Remo + 100 DU + 80 Squats + 60 Sit-ups + 40 Thrusters + 20 Ring Rows."] }
+                    ]}
+                };
+
+                const phaseMarch = {
+                    1: { name: "LUNES: Fuerza de Base y Transición de Gimnasia", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 400m Remo + 10 Ring Rows altos + 15 Goblet Squats (con DB de 40 lbs) + 30 seg Superman Hold."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Sentadilla Trasera", sets: "3", reps: "3", weight: calc(315, info.isDeload) }] },
+                        { title: "METCON", type: "metcon", items: ["'The Burner' (5 Rondas por tiempo): 12 DB Thrusters (40 lbs) + 12 Box Jumps + 12 V-Ups."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Gimnasia: 4 series de: 5 Transiciones de Muscle-up (pies apoyados) + 10 Ring Dips asistidos.", "Pecho: 3x10 Incline DB Press + 3x12 Chest Flyes con banda."] },
+                        { title: "BONUS", type: "bonus", items: ["40 min Rower Zona 2 + 5 Sprints de 30 seg."] }
+                    ]},
+                    2: { name: "MARTES: Halterofilia con Pausa y Empuje", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["Movilidad hombro PVC + 3 rondas: 10 Muscle Cleans + 10 Strict Press + 1 min DU."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "C&J Complex (1 SqC Pausa 2s Rodilla + 1 SJ)", sets: "5", reps: "1", weight: info.isDeload ? calc(210, true) : (info.weekInCycle === 1 ? "205-215" : (210 + info.strengthIncrement)) },
+                            { name: "Press Estricto", sets: "5", reps: "3", weight: calc(153, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'Acid Lung' (AMRAP 12 min): 10 Hang Power Cleans (155) + 15 Burpees over bar."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 series: 12 DB Pullovers + 15 Tricep Extensions + 20 Hollow Rocks."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower (Ritmo recuperación)."] }
+                    ]},
+                    3: { name: "MIÉRCOLES: Peso Muerto en Déficit y Motor", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min Rower progresivo + Movilidad isquios + 3 rondas: 10 Good Mornings + 15 KB Swings."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Peso Muerto en Déficit (Disco 45lb bajo pies)", sets: "4", reps: "3", weight: calc(315, info.isDeload) }] },
+                        { title: "METCON", type: "metcon", items: ["'Rowing Death': 2000m Remo + 50 DB Thrusters (40 lbs) + 1000m Remo."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 series: 12 Ring Rows (Pies elevados) + 12 Face Pulls con banda."] },
+                        { title: "BONUS", type: "bonus", items: ["45 min Rower Zona 2 constante."] }
+                    ]},
+                    4: { name: "JUEVES: Habilidad Invertida y Densidad", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min movilidad muñecas/hombros + 3 rondas: 45 seg Wall Walk + 15 Air Squats."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "HSPU con Déficit (Discos 10-25lb)", sets: "5", reps: "5", weight: "BW" }] },
+                        { title: "METCON", type: "metcon", items: ["'Ring & Jump' (EMOM 20 min): M1: 10 Ring Dips, M2: 15 Box Jumps, M3: 15 Push-ups, M4: Descanso."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 series: 15 Bicep Curls DB + 15 Lateral Raises + 1 min Plank."] },
+                        { title: "BONUS", type: "bonus", items: ["35 min Rower Zona 2."] }
+                    ]},
+                    5: { name: "VIERNES: Snatch de Precisión y Pecho", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 10 Snatch Balance + 10 OHS + 1 min Saltos cuerda."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "Snatch Complex (1 SqS Pausa 2s Rodilla + 1 OHS)", sets: "5", reps: "1", weight: info.isDeload ? calc(165, true) : (info.weekInCycle === 1 ? "160-170" : (165 + info.strengthIncrement)) },
+                            { name: "Sentadilla Frontal", sets: "4", reps: "3", weight: calc(285, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'The Couplet' (21-15-9): Snatch (115) + Ring Rows."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Pecho: 3x10 Decline DB Press + 3x Max Dips.", "Gimnasia: 4 series de 5 Negativas Muscle-up (5 seg)."] },
+                        { title: "BONUS", type: "bonus", items: ["45 min Rower Zona 2."] }
+                    ]},
+                    6: { name: "SÁBADO: March Madness (Cap 45 min)", blocks: [
+                        { title: "METCON", type: "metcon", items: ["3 Rondas: 1000m Remo + 50 DU + 30 DB Thrusters (40 lbs) + 20 T2B + 10 Burpee Box Jump Overs."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 rondas: 15 Back Extensions + 1 min Hanging L-Sit."] },
+                        { title: "BONUS", type: "bonus", items: ["20 min Estiramiento y Foam Roller."] }
+                    ]}
+                };
+
+                const phaseApril = {
+                    1: { name: "LUNES: Fuerza Explosiva y Agilidad", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 500m Remo suave + 10 Ring Swings + 15 Air Squats + 10 Scapular Push-ups."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Sentadilla Trasera (Explosiva)", sets: "3", reps: "2", weight: calc(325, info.isDeload) }] },
+                        { title: "METCON", type: "metcon", items: ["'The Triple Ten' (10 Rondas): 10 DB Thrusters (40 lbs) + 10 T2B + 10 Box Jumps."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Gimnasia: 4x5 RMU Transitions + 8 Ring Dips.", "Pecho: 3x8 DB Bench Press (Pausa 2s) + 3x15 Flyes con banda."] },
+                        { title: "BONUS", type: "bonus", items: ["40 min Rower Zona 2 + 5 min Sprints finales."] }
+                    ]},
+                    2: { name: "MARTES: Halterofilia de Competencia y Empuje", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 10 Burgener Warm-up + 10 Strict Press + 50 DU."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "C&J (Full Squat)", sets: "5", reps: "1", weight: calc(230, info.isDeload) },
+                            { name: "Press Estricto", sets: "4", reps: "2", weight: calc(160, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'Acid Trip' (AMRAP 12): 5 Power Cleans (185) + 10 Burpees + 15 Wall Walks / HSPU."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 series: 12 DB Pullovers + 15 French Press + 1 min Plank con peso."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower (Ritmo suave)."] }
+                    ]},
+                    3: { name: "MIÉRCOLES: Peso Muerto Pesado y Resistencia", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min Rower + Movilidad cadera profunda + 3 rondas 10 KB Swings pesados."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Peso Muerto (Técnica Competencia)", sets: "3", reps: "2", weight: calc(365, info.isDeload) }] },
+                        { title: "METCON", type: "metcon", items: ["'The Grunt' (3 Rondas): 1000m Remo + 30 DB Thrusters (40 lbs) + 20 Ring Rows (Pies elevados)."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 series: 12 Face Pulls + 12 Bent Over Rows (155)."] },
+                        { title: "BONUS", type: "bonus", items: ["50 min Rower Zona 2."] }
+                    ]},
+                    4: { name: "JUEVES: Gimnasia Dinámica y Volumen", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["Movilidad muñecas + 3 rondas: 30 seg Handstand Hold + 10 Beat Swings + 15 Air Squats."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "HSPU", sets: "5", reps: "Max Reps", weight: "BW" }] },
+                        { title: "METCON", type: "metcon", items: ["'Anarchy Rings' (EMOM 20 min): M1: 5-8 Ring Dips, M2: 12 Box Jumps, M3: 15 Push-ups en anillas bajas, M4: Descanso."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 series: 15 Bicep Curls + 15 Lateral Raises + 20 V-Ups."] },
+                        { title: "BONUS", type: "bonus", items: ["35 min Rower Zona 2."] }
+                    ]},
+                    5: { name: "VIERNES: Snatch de Potencia y Estética", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["Pasos de banda + 3 rondas: 10 High Hang Snatch + 10 OHS + 1 min Saltos cuerda."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "Snatch (Full Squat)", sets: "5", reps: "1", weight: calc(185, info.isDeload) },
+                            { name: "Sentadilla Frontal", sets: "3", reps: "2", weight: calc(315, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'Sprint & Grip' (21-15-9): DB Thrusters + T2B + Burpees."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Pecho: 3x10 Decline DB Press + 3x Max Dips.", "Gimnasia: 4x5 Ring Swings potentes + 3 Negativas MU (5s)."] },
+                        { title: "BONUS", type: "bonus", items: ["45 min Rower Zona 2."] }
+                    ]},
+                    6: { name: "SÁBADO: Día de Motor Largo (Cap 45 min)", blocks: [
+                        { title: "METCON", type: "metcon", items: ["'The April Crusher': 3000m Remo + 150 DU + 100 Squats + 80 Sit-ups + 60 Thrusters + 40 Ring Rows + 20 BBJO."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 rondas: 1 min Hanging L-Sit + 20 Back Extensions."] },
+                        { title: "BONUS", type: "bonus", items: ["20 min Estiramiento + 10 min Meditación."] }
+                    ]}
+                };
+
+                const phaseMay = {
+                    1: { name: "LUNES: Fuerza Máxima y Potencia Gimnástica", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 500m Remo + 10 Ring Swings + 15 Jumping Squats + 1 min Plank."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Sentadilla Trasera", sets: "3", reps: "2", weight: calc(335, info.isDeload) }] },
+                        { title: "METCON", type: "metcon", items: ["'The May Sprint' (AMRAP 12): 12 DB Thrusters + 12 T2B + 12 Box Jump Overs."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Gimnasia: 5 series: 3 Ring Dips estrictos + 5 RMU Transitions.", "Pecho: 4x6 DB Bench Press (Cerca fallo) + 3x12 Incline Flyes."] },
+                        { title: "BONUS", type: "bonus", items: ["45 min Rower Zona 2."] }
+                    ]},
+                    2: { name: "MARTES: Halterofilia Pesada y Empuje", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["Movilidad hombros + 3 rondas: 10 Burgener Warm-up + 30s Handstand Hold + 50 DU."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "C&J (Competencia)", sets: "4", reps: "1", weight: calc(245, info.isDeload) },
+                            { name: "Press Estricto", sets: "3", reps: "2", weight: calc(165, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'HSPU Stamina': 500m Remo + 30 HSPU + 500m Remo + 20 HSPU + 500m Remo + 10 HSPU."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 series: 15 DB Pullovers + 15 Skullcrushers + 20 Weighted Sit-ups."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower (Recuperación)."] }
+                    ]},
+                    3: { name: "MIÉRCOLES: Fuerza de Tracción Pura", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min Rower + 3 rondas 10 Good Mornings + 10 Burpees lentos."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Peso Muerto (Re-ajuste)", sets: "4", reps: "1", weight: calc(375, info.isDeload) }] },
+                        { title: "METCON", type: "metcon", items: ["'The Engine Room': 1000m Remo + 30 DB Thrusters + 20 Pull-ups/Ring Rows."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["4 series: 10 Pendlay Rows (165-185) + 12 Face Pulls."] },
+                        { title: "BONUS", type: "bonus", items: ["60 min Rower Zona 2."] }
+                    ]},
+                    4: { name: "JUEVES: Habilidad en Anillas y Volumen", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min movilidad muñecas/hombros + 3 rondas: 10 Ring Support Shrugs + 15 Air Squats."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "HSPU con Déficit", sets: "4", reps: "Max Reps", weight: "BW" }] },
+                        { title: "METCON", type: "metcon", items: ["'Ring King' (EMOM 20 min): M1: 3-5 RMU Attempt / 8 Ring Dips, M2: 20 DU, M3: 15 Box Jumps, M4: Descanso."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 series: 15 Bicep Curls + 15 Lateral Raises + 1 min Hollow Hold."] },
+                        { title: "BONUS", type: "bonus", items: ["40 min Rower Zona 2."] }
+                    ]},
+                    5: { name: "VIERNES: Snatch Pesado y Estética Final", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 10 Snatch Balance + 10 OHS + 1 min Salto cuerda."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "Snatch", sets: "4", reps: "1", weight: calc(195, info.isDeload) },
+                            { name: "Sentadilla Frontal", sets: "3", reps: "1", weight: calc(335, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'The Final Burn' (21-15-9): Thrusters + Ring Dips + V-ups."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Pecho: 4x10 Decline DB Press + 4x Max Dips.", "Gimnasia: 5 series 3 Negativas MU (8 seg)."] },
+                        { title: "BONUS", type: "bonus", items: ["45 min Rower Zona 2."] }
+                    ]},
+                    6: { name: "SÁBADO: Mayo Monster", blocks: [
+                        { title: "METCON", type: "metcon", items: ["'Mayo Monster': 2000m Remo + 50 Burpees + 100 Air Squats + 150 DU + 50 DB Thrusters + 1000m Remo final."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 rondas: 20 Back Extensions + 1 min Hanging L-sit."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min estiramiento profundo + Foam Roller."] }
+                    ]}
+                };
+
+                const phaseJune = {
+                    1: { name: "LUNES: Día de la Sentadilla y Estabilidad", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["10 min Remo progresivo + Movilidad cadera/tobillo + 2 rondas 10 Air Squats lentas con banda."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Sentadilla Trasera", sets: "3", reps: "1", weight: info.isDeload ? calc(355, true) : (info.weekInCycle === 3 ? calc(375, false) : calc(355, false)) }] },
+                        { title: "METCON", type: "metcon", items: ["'The Final Sprint' (AMRAP 10): 10 DB Thrusters + 10 T2B + 30 DU."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Gimnasia: 3 series RMU Attempts (Sin banda).", "Pecho: 3x5 DB Bench Press (Max) + 3x10 Dips lastrados."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower Zona 2."] }
+                    ]},
+                    2: { name: "MARTES: Clean & Jerk y HSPU", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["3 rondas: 10 Burgener Warm-up + 30s Handstand Hold + 10 Muscle Cleans."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "C&J (Split Jerk Perfecto)", sets: "4", reps: "1", weight: calc(250, info.isDeload) },
+                            { name: "Press Estricto", sets: "3", reps: "1", weight: calc(170, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'HSPU Finisher' (3 Rondas): 15 HSPU Estrictos + 15 DB Power Cleans (40) + 15 Burpees."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 series 15 Skullcrushers + 15 Pullovers + 20 Hollow Rocks."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower Zona 2."] }
+                    ]},
+                    3: { name: "MIÉRCOLES: Peso Muerto (The King)", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["15 min movilidad cadena posterior + 10 min Remo suave."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Peso Muerto", sets: "3", reps: "1", weight: info.isDeload ? calc(385, true) : (info.weekInCycle === 3 ? calc(405, false) : calc(385, false)) }] },
+                        { title: "METCON", type: "metcon", items: ["'Lungs on Fire' (500-400-300-200-100m): Remo + DB Thrusters. Descanso 1:1."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 series: 10 Weighted Ring Rows + 12 Face Pulls."] },
+                        { title: "BONUS", type: "bonus", items: ["45 min Rower Zona 2."] }
+                    ]},
+                    4: { name: "JUEVES: Habilidad y Dinámica de Anillas", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["Movilidad muñecas + 3 rondas: 10 Ring Swings + 5 Negative Dips + 20 Air Squats."] },
+                        { title: "FORTALECIMIENTO", type: "fuerza", exercises: [{ name: "Práctica MU Anillas (15 min)", sets: "1", reps: "Series de 1-2", weight: "BW" }] },
+                        { title: "METCON", type: "metcon", items: ["'Ring Density' (EMOM 15 min): M1: 5 Ring Dips estrictos, M2: 15 Box Jumps, M3: 15 Push-ups explosivas."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 series: 15 Bicep Curls + 15 Lateral Raises + 1 min Plank."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower Zona 2."] }
+                    ]},
+                    5: { name: "VIERNES: Snatch y Estética de Cierre", blocks: [
+                        { title: "CALENTAMIENTO", type: "calentamiento", items: ["Pasos banda + 3 rondas: 10 Snatch Balance + 10 OHS + 1 min saltos cuerda."] },
+                        { title: "HALTEROFILIA", type: "fuerza", exercises: [
+                            { name: "Snatch", sets: "4", reps: "1", weight: calc(200, info.isDeload) },
+                            { name: "Sentadilla Frontal", sets: "3", reps: "1", weight: calc(335, info.isDeload) }
+                        ]},
+                        { title: "METCON", type: "metcon", items: ["'Fran' (21-15-9): Thrusters (95 o DB 40s) + Pull-ups."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["Pecho: 3x10 Decline DB Press + 3x Max Dips.", "Gimnasia: 4x3 Negativas MU (10 seg)."] },
+                        { title: "BONUS", type: "bonus", items: ["30 min Rower Zona 2."] }
+                    ]},
+                    6: { name: "SÁBADO: El Gran Final (Test de Motor)", blocks: [
+                        { title: "METCON", type: "metcon", items: ["'JUNE HERO': 2000m Remo + 50 Ring Rows / 20 RMU + 100 DB Thrusters + 200 DU + 100 Sit-ups + 2000m Remo final."] },
+                        { title: "ACCESORIOS", type: "accesorios", items: ["3 rondas: 20 Back Extensions + 1 min L-Sit Hold."] },
+                        { title: "BONUS", type: "bonus", items: ["Estiramiento profundo y celebración."] }
+                    ]}
+                };
+
+                if (info.block === 1) return phaseJanFeb[day];
+                if (info.block === 2) return phaseMarch[day];
+                if (info.block === 3) return phaseApril[day];
+                if (info.block === 4) return phaseMay[day];
+                if (info.block === 5) return phaseJune[day];
+                return null;
+            };
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col bg-[#050505] text-white">
+                    <div className="flex-1 pb-24 overflow-y-auto">
+                        {selectedDate ? (
+                            <DayDetail date={selectedDate} workout={getWorkout(selectedDate)} unit={unit} info={getCycleInfo(selectedDate)} onBack={() => setSelectedDate(null)} />
+                        ) : (
+                            view === 'calendar' ? (
+                                <Calendar currentMonthIdx={currentMonthIdx} setCurrentMonthIdx={setCurrentMonthIdx} onDayClick={setSelectedDate} getCycleInfo={getCycleInfo} />
+                            ) : (
+                                <Benchmarks data={data} setData={setData} />
+                            )
+                        )}
+                    </div>
+                    {!selectedDate && (
+                        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto glass border-t border-white/5 px-10 py-6 flex justify-around items-center z-50 rounded-t-[2.5rem]">
+                            <button onClick={() => setView('calendar')} className={view === 'calendar' ? 'text-violet-500' : 'text-white/20'}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            </button>
+                            <button onClick={() => setView('marks')} className={view === 'marks' ? 'text-violet-500' : 'text-white/20'}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            </button>
+                        </nav>
+                    )}
+                </div>
+            );
         }
 
-        // --- RUTINAS COMPLETAS ---
-        const routines = {
-            1: { name: "Lunes: Fuerza Base", blocks: [{ t: "FUERZA", ex: "Sentadilla Trasera", w: "squat", s: "5x5" }, { t: "METCON", ex: "The Engine", d: "10 DB Thrusters, 20 DU (AMRAP 15)" }] },
-            2: { name: "Martes: Halterofilia", blocks: [{ t: "FUERZA", ex: "C&J Complex", w: "clean", s: "5x1" }, { t: "EXTRA", ex: "Press Estricto", w: "press", s: "4x5" }] },
-            3: { name: "Miércoles: Tracción", blocks: [{ t: "FUERZA", ex: "Peso Muerto", w: "deadlift", s: "3x5" }, { t: "METCON", ex: "Heavy Breathing", d: "EMOM 16: Thrusters & Row" }] },
-            4: { name: "Jueves: Habilidad", blocks: [{ t: "SKILL", ex: "HSPU Estrictos", s: "5xMax" }, { t: "METCON", ex: "Triple Threat", d: "21-15-9 Thrusters & V-Ups" }] },
-            5: { name: "Viernes: Snatch", blocks: [{ t: "FUERZA", ex: "Snatch Complex", w: "snatch", s: "5x1" }, { t: "EXTRA", ex: "Front Squat", w: "frontSquat", s: "3x5" }] },
-            6: { name: "Sábado: Volumen", blocks: [{ t: "ENDURANCE", ex: "The Long Haul", d: "2000m Remo (Cap 45 min)" }] },
-            0: { name: "Domingo: Descanso", blocks: [] }
-        };
-
-        let activeDate = new Date();
-
-        function render() {
-            const root = document.getElementById('app');
-            const dayNum = activeDate.getDay();
-            const routine = routines[dayNum];
+        function Calendar({ currentMonthIdx, setCurrentMonthIdx, onDayClick, getCycleInfo }) {
+            const months = [
+                { name: "Enero 2026", days: 31, offset: 3 },
+                { name: "Febrero 2026", days: 28, offset: 6 },
+                { name: "Marzo 2026", days: 31, offset: 6 },
+                { name: "Abril 2026", days: 30, offset: 2 },
+                { name: "Mayo 2026", days: 31, offset: 4 },
+                { name: "Junio 2026", days: 30, offset: 0 }
+            ];
+            const m = months[currentMonthIdx];
             
-            root.innerHTML = `
-                <header class="p-8 pt-12 flex justify-between items-start">
-                    <div>
-                        <h1 class="text-2xl font-black italic uppercase leading-none">ATLETA<span class="text-purple-500">PRO</span></h1>
-                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">Elite Programming 2026</p>
-                    </div>
-                    <div class="bg-purple-500/10 border border-purple-500/20 px-3 py-1 rounded-full">
-                        <span class="text-[9px] font-black text-purple-400 uppercase tracking-tighter">Fase 1: Enero</span>
-                    </div>
-                </header>
-
-                <main class="px-6 space-y-8 animate-in">
-                    <!-- Selector de Días -->
-                    <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                        ${[1,2,3,4,5,6,0].map(d => {
-                            const labels = ['D','L','M','M','J','V','S'];
-                            const isActive = activeDate.getDay() === d;
-                            return `
-                                <button onclick="setDay(${d})" class="flex-shrink-0 w-12 py-4 rounded-3xl border transition-all duration-300 ${isActive ? 'bg-purple-600 border-purple-400 scale-105' : 'bg-gray-900/50 border-gray-800 opacity-60'}">
-                                    <span class="text-[10px] block font-black mb-1">${labels[d]}</span>
-                                    <span class="font-black text-sm">${d === 0 ? 'R' : d}</span>
-                                </button>
-                            `;
-                        }).join('')}
-                    </div>
-
-                    <!-- Rutina del Día -->
-                    <div class="space-y-6">
-                        <div class="flex justify-between items-end">
-                            <h2 class="text-4xl font-black italic uppercase tracking-tighter leading-none">${routine.name}</h2>
-                            <p class="text-[10px] font-bold text-gray-600 mb-1 uppercase">${activeDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</p>
+            return (
+                <div className="p-6 animate-in">
+                    <header className="flex justify-between items-end mb-8">
+                        <div>
+                            <p className="text-[10px] font-black text-violet-500 tracking-[0.3em] mb-1 uppercase">Athlete Pro Elite</p>
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setCurrentMonthIdx(Math.max(0, currentMonthIdx-1))} className="text-white/20">←</button>
+                                <h2 className="text-3xl font-black italic uppercase tracking-tighter">{m.name}</h2>
+                                <button onClick={() => setCurrentMonthIdx(Math.min(5, currentMonthIdx+1))} className="text-white/20">→</button>
+                            </div>
                         </div>
-                        
-                        ${routine.blocks.length > 0 ? routine.blocks.map(b => `
-                            <div class="workout-card p-8">
-                                <span class="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em] block mb-6">${b.t}</span>
-                                <div class="flex justify-between items-end">
-                                    <div class="max-w-[70%]">
-                                        <p class="text-xl font-bold leading-tight uppercase italic">${b.ex}</p>
-                                        <p class="text-[10px] font-black text-gray-500 uppercase mt-1 tracking-widest">${b.s || 'COMPLETA EL BLOQUE'}</p>
+                    </header>
+                    <div className="glass p-6 rounded-[2.5rem]">
+                        <div className="calendar-grid">
+                            {["L", "M", "M", "J", "V", "S", "D"].map(d => <div key={d} className="text-[9px] text-center font-black text-white/20 mb-2">{d}</div>)}
+                            {[...Array(m.offset)].map((_, i) => <div key={i} />)}
+                            {[...Array(m.days)].map((_, i) => {
+                                const dayNum = i + 1;
+                                const dateStr = `2026-${String(currentMonthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                                const info = getCycleInfo(dateStr);
+                                const isSunday = new Date(dateStr + "T12:00:00").getDay() === 0;
+                                const isLocked = info?.status === "AWAIT_UPDATE";
+                                
+                                return (
+                                    <div key={dayNum} onClick={() => info && onDayClick(dateStr)} 
+                                        className={`day-cell ${isSunday ? 'is-Sunday' : ''} ${info && !isSunday && !isLocked ? 'has-workout' : 'opacity-10'} ${info?.isDeload && !isSunday ? 'is-deload' : ''} ${isLocked ? 'cursor-not-allowed' : ''}`}>
+                                        {dayNum}
                                     </div>
-                                    ${b.w ? `
-                                        <div class="text-right">
-                                            <span class="text-3xl font-black italic leading-none">${getWeight(baseWeights[b.w], activeDate)}</span>
-                                            <span class="text-[10px] font-black text-purple-500 ml-1">LB</span>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                                ${b.d ? `<p class="mt-6 text-xs text-gray-400 italic border-l-2 border-purple-500/30 pl-4 leading-relaxed">${b.d}</p>` : ''}
-                            </div>
-                        `).join('') : `
-                            <div class="py-24 text-center">
-                                <i data-lucide="coffee" class="mx-auto mb-4 text-gray-800 w-12 h-12"></i>
-                                <p class="opacity-20 font-black italic uppercase text-3xl tracking-widest">Recovery Day</p>
-                                <p class="text-[10px] text-gray-600 uppercase font-bold mt-2 tracking-widest">Cuerpo y Mente al 100%</p>
-                            </div>
-                        `}
+                                );
+                            })}
+                        </div>
                     </div>
-                </main>
-
-                <!-- Barra de Navegación -->
-                <nav class="fixed bottom-0 left-0 right-0 nav-blur border-t border-white/5 py-8 px-12 flex justify-around items-center z-50">
-                    <button class="transition-transform active:scale-90"><i data-lucide="calendar" class="text-purple-500 w-6 h-6"></i></button>
-                    <button class="transition-transform active:scale-90"><i data-lucide="zap" class="text-gray-600 w-6 h-6"></i></button>
-                    <button class="transition-transform active:scale-90"><i data-lucide="user" class="text-gray-600 w-6 h-6"></i></button>
-                </nav>
-            `;
-            // Reiniciar los iconos de Lucide
-            lucide.createIcons();
+                </div>
+            );
         }
 
-        // Función para cambiar de día manualmente
-        function setDay(d) {
-            const now = new Date();
-            const currentDay = now.getDay();
-            let diff = d - currentDay;
-            
-            const newDate = new Date();
-            newDate.setDate(now.getDate() + diff);
-            activeDate = newDate;
-            render();
+        function DayDetail({ date, workout, unit, info, onBack }) {
+            if (info?.status === "AWAIT_UPDATE") {
+                return (
+                    <div className="p-6 text-center mt-20 animate-in">
+                        <button onClick={onBack} className="text-xs font-black text-violet-400 uppercase mb-10 tracking-widest">← Volver</button>
+                        <div className="glass p-10 rounded-[3rem]">
+                            <h2 className="text-2xl font-black italic uppercase leading-none text-white/50 mb-4">ESPERANDO ACTUALIZACIÓN</h2>
+                            <p className="text-xs text-white/20 uppercase font-bold tracking-widest">Próximo bloque en desarrollo</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const formattedDate = new Date(date+"T12:00:00").toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+            if (!workout) return <div className="p-6 text-center mt-20"><button onClick={onBack} className="text-xs font-black text-violet-400 uppercase mb-6 tracking-widest">← Volver</button></div>;
+
+            return (
+                <div className="p-6 animate-in pb-20">
+                    <button onClick={onBack} className="text-xs font-black text-violet-400 uppercase mb-6 tracking-widest">← Calendario</button>
+                    <div className="mb-6">
+                        <div className="flex gap-2">
+                             <span className="bg-violet-500/20 text-violet-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Semana {info.absoluteWeek}</span>
+                             {info.strengthIncrement > 0 && <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Prog +{info.strengthIncrement} LB</span>}
+                        </div>
+                        <h2 className="text-3xl font-black italic uppercase mt-4 leading-none">{workout.name}</h2>
+                        <p className="text-white/30 font-bold text-[10px] uppercase mt-2">{formattedDate}</p>
+                    </div>
+                    {workout.blocks.map((block, idx) => (
+                        <div key={idx} className={`workout-card glass p-6 rounded-[2rem] ${block.type}`}>
+                            <p className="text-[10px] font-black text-white/20 tracking-[0.2em] mb-4 uppercase">{block.title}</p>
+                            {block.exercises ? block.exercises.map((ex, i) => (
+                                <div key={i} className="flex justify-between items-center mb-4 last:mb-0">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-black uppercase leading-tight">{ex.name}</p>
+                                        <p className="text-[10px] text-white/40 font-bold uppercase">{ex.sets} × {ex.reps}</p>
+                                    </div>
+                                    <div className="text-xl font-black italic text-violet-400">{ex.weight} {typeof ex.weight === 'number' ? unit : ''}</div>
+                                </div>
+                            )) : (
+                                <ul className="space-y-3">
+                                    {block.items.map((it, i) => <li key={i} className="text-xs text-white/70 font-medium leading-relaxed">• {it}</li>)}
+                                </ul>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            );
         }
 
-        // Iniciar la app al cargar la ventana
-        window.onload = render;
+        function Benchmarks({ data, setData }) {
+            return (
+                <div className="p-6 animate-in">
+                    <h2 className="text-4xl font-black italic mb-8 uppercase tracking-tighter">Benchmarks</h2>
+                    <div className="grid gap-3">
+                        {Object.entries(data.benchmarks).map(([key, val]) => (
+                            <div key={key} className="glass p-5 rounded-3xl flex justify-between items-center">
+                                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{key}</span>
+                                <input type="number" className="bg-transparent text-right font-black text-2xl w-24 outline-none text-violet-400" value={val} 
+                                    onChange={(e) => setData(p => ({...p, benchmarks: {...p.benchmarks, [key]: parseFloat(e.target.value) || 0}}))} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
